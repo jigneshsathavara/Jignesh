@@ -11,6 +11,7 @@ import os
 from flask_mysqldb import MySQL
 import secrets
 import os
+from random import randint
 local_server = os.environ.get('IS_PRODUCTION') != '1'
 
                          
@@ -18,7 +19,6 @@ socket.getaddrinfo('localhost', 8080)
 
 with open('config.json', 'r') as c:
     params = json.load(c)["params"]
-
 
 app = Flask(__name__)
 app.secret_key = 'super-secret-key'
@@ -31,7 +31,9 @@ app.config.update(
 )
 
 mail = Mail(app)
+otp = str(randint(0000, 9999))
 local_server = True
+
 if(local_server):
     app.config['SQLALCHEMY_DATABASE_URI'] = params['local_uri']
 else:
@@ -94,19 +96,68 @@ class User(db.Model):
 
 @app.route("/register",methods=['GET','POST'])
 def register():
+    return render_template('register.html', params=params)
+
+@app.route("/verify",methods=['GET','POST'])
+def verify():
     if request.method == 'POST':
         uname = request.form['uname']
         umail = request.form['umail']
-        password = request.form['password']
-    
-    # Create a new user and add to the database
+
+        session['otp'] = otp
+        session['uname'] = uname
+        session['umail'] = umail
+
+        mail.send_message(subject="Otp verification",
+                          sender=params['gmail-user'],  # Changed to a string
+                          recipients=[umail],  # Ensure this is a list
+                          body =f"Your OTP is: {otp}"
+                          )
+        flash("Otp has been sent your email. ","success")
+        return redirect("/verify1")
+    return render_template("verify.html")
+
+@app.route("/verify1",methods=['GET','POST'])
+def verify1():
+    if request.method == 'POST':
+        userotp = request.form.get('otp')
+        session_otp = session.get('otp')
+
+        if userotp == session_otp :
+            flash("OTP verify successfully!", "success")
+            return redirect('/password')
+        else:
+            flash("Invalid OTP. Please try again.", "danger")
+            return redirect('/verify')
+    return render_template("verify.html")
+
+@app.route("/password",methods=['GET','POST'])
+def password():
+    if request.method == 'POST':
+        password=request.form.get('password')
+        if password:
+            session['password'] = password
+            return redirect('/reg')
+    return render_template('password.html')
+
+@app.route("/reg", methods =['GET', 'POST'])
+def reg():
+    if request.method == 'POST':
+        uname=session.get('uname')
+        umail=session.get('umail')
+        password=session.get('password')
+
+        if not all([uname, umail, password]):
+            flash("Session data missing. Please try again.", "danger")
+            return redirect("/verify")
+        
         new_user = User(uname=uname, umail=umail, password=password)
         db.session.add(new_user)
         db.session.commit()
-        flash("Registration successfully. ","success")
+        session.pop('password', None)  # Clear sensitive data
+        flash("Registration successfully!", "success")
         return redirect('/login')
-
-    return render_template('register.html', params=params)
+    return render_template("/password.html")
 
 @app.route("/login",methods=['GET','POST'])
 def login():
