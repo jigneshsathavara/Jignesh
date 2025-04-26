@@ -137,30 +137,28 @@ def verify1():
 @app.route("/password",methods=['GET','POST'])
 def password():
     if request.method == 'POST':
-        password=request.form.get('password')
+        password = request.form.get('password')
         if password:
             session['password'] = password
-            return redirect('/reg')
+
+            # Create user directly here
+            uname = session.get('uname')
+            umail = session.get('umail')
+
+            if not all([uname, umail, password]):
+                flash("Session data missing. Please try again.", "danger")
+                return redirect("/verify")
+
+            new_user = User(uname=uname, umail=umail, password=password)
+            db.session.add(new_user)
+            db.session.commit()
+
+            # Clear sensitive session data
+            session.pop('password', None)
+            flash("Registration successfully!", "success")
+            return redirect('/login')
     return render_template('password.html')
 
-@app.route("/reg", methods =['GET', 'POST'])
-def reg():
-    if request.method == 'POST':
-        uname=session.get('uname')
-        umail=session.get('umail')
-        password=session.get('password')
-
-        if not all([uname, umail, password]):
-            flash("Session data missing. Please try again.", "danger")
-            return redirect("/verify")
-        
-        new_user = User(uname=uname, umail=umail, password=password)
-        db.session.add(new_user)
-        db.session.commit()
-        session.pop('password', None)  # Clear sensitive data
-        flash("Registration successfully!", "success")
-        return redirect('/login')
-    return render_template("password.html")
 
 @app.route("/login",methods=['GET','POST'])
 def login():
