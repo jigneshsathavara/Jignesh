@@ -12,6 +12,7 @@ from flask_mysqldb import MySQL
 import secrets
 import os
 from random import randint
+import random
 local_server = os.environ.get('IS_PRODUCTION') != '1'
 
                          
@@ -31,7 +32,6 @@ app.config.update(
 )
 
 mail = Mail(app)
-otp = str(randint(0000, 9999))
 local_server = True
 
 if(local_server):
@@ -104,9 +104,11 @@ def verify():
         uname = request.form['uname']
         umail = request.form['umail']
 
-        session['otp'] = otp
         session['uname'] = uname
         session['umail'] = umail
+        
+        otp = str(random.randint(1000, 9999))
+        session['otp'] = otp
 
         mail.send_message(subject="Otp verification",
                           sender=params['gmail-user'],  # Changed to a string
@@ -120,10 +122,11 @@ def verify():
 @app.route("/verify1",methods=['GET','POST'])
 def verify1():
     if request.method == 'POST':
-        userotp = request.form.get('otp')
-        session_otp = session.get('otp')
-
-        if userotp == session_otp :
+        otp = request.form.get('otp', '').strip()
+        or_otp = str(session.get('otp', '')).strip()
+        
+        
+        if otp == or_otp:
             flash("OTP verify successfully!", "success")
             return redirect('/password')
         else:
@@ -157,7 +160,7 @@ def reg():
         session.pop('password', None)  # Clear sensitive data
         flash("Registration successfully!", "success")
         return redirect('/login')
-    return render_template("/password.html")
+    return render_template("password.html")
 
 @app.route("/login",methods=['GET','POST'])
 def login():
