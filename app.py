@@ -84,117 +84,8 @@ class Edcs(db.Model):
     content = db.Column(db.String(120), nullable=True)
     post_date = db.Column(db.String(), nullable=True)
 
-class User(db.Model):
-    '''
-     name, email, password
-    '''
-    id = db.Column(db.Integer, primary_key=True)
-    uname = db.Column(db.String(150), nullable=True)
-    umail = db.Column(db.String(150), nullable=True)
-    password = db.Column(db.String(150), nullable=True)
-    reset_token = db.Column(db.String(255), unique=True, nullable=True)
 
-@app.route("/register",methods=['GET','POST'])
-def register():
-    return render_template('register.html', params=params)
-
-@app.route("/verify",methods=['GET','POST'])
-def verify():
-    if request.method == 'POST':
-        uname = request.form['uname']
-        umail = request.form['umail']
-
-        session['uname'] = uname
-        session['umail'] = umail
-        
-        otp = str(random.randint(1000, 9999))
-        session['otp'] = otp
-
-        mail.send_message(subject="Otp verification",
-                          sender=params['gmail-user'],  # Changed to a string
-                          recipients=[umail],  # Ensure this is a list
-                          body =f"Your OTP is: {otp}"
-                          )
-        flash("Otp has been sent your email. ","success")
-        return redirect("/verify1")
-    return render_template("verify.html")
-
-@app.route("/verify1",methods=['GET','POST'])
-def verify1():
-    if request.method == 'POST':
-        otp = request.form.get('otp', '').strip()
-        or_otp = str(session.get('otp', '')).strip()
-        
-        
-        if otp == or_otp:
-            flash("OTP verify successfully!", "success")
-            return redirect('/password')
-        else:
-            flash("Invalid OTP. Please try again.", "danger")
-            return redirect('/verify')
-    return render_template("verify.html")
-
-@app.route("/password",methods=['GET','POST'])
-def password():
-    if request.method == 'POST':
-        password = request.form.get('password')
-        if password:
-            session['password'] = password
-
-            # Create user directly here
-            uname = session.get('uname')
-            umail = session.get('umail')
-
-            if not all([uname, umail, password]):
-                flash("Session data missing. Please try again.", "danger")
-                return redirect("/verify")
-
-            new_user = User(uname=uname, umail=umail, password=password)
-            db.session.add(new_user)
-            db.session.commit()
-
-            # Clear sensitive session data
-            session.pop('password', None)
-            flash("Registration successfully!", "success")
-            return redirect('/login')
-    return render_template('password.html')
-
-
-@app.route("/login",methods=['GET','POST'])
-def login():
-    if request.method == 'POST':
-        umail = request.form['umail']
-        password = request.form['password']
-
-        # Check if user exists
-        user = User.query.filter_by(umail=umail, password=password).first()
-        if user:
-            session['umail'] = umail  # Store username in session
-            session['password'] = password
-            return redirect('/home')
-        else:
-            flash("check email, password and try again. ","danger")
-            return redirect('/login')
-    return render_template('login.html')
-
-@app.route("/",methods=['GET','POST'])
-def index():
-    if request.method == 'POST':
-        umail = request.form.get('umail')
-        password = request.form.get('password')
-
-        # Check if user exists
-        user = User.query.filter_by(umail=umail, password=password).first()
-        if user:
-            session['umail'] = umail  # Store username in session
-            session['password'] = password
-            return redirect('/home')  # Refresh home page with session
-        else:
-            flash("check email, password and try again. ","danger")
-            return redirect('/login')
-    return render_template('login.html', params=params, )
-
-@app.route('/home',methods=['GET','POST'])
+@app.route('/',methods=['GET','POST'])
 def home():
     expe = Expes.query.all()
     edc = Edcs.query.all()
@@ -246,8 +137,7 @@ def dashboard():
         project = Projects.query.all()
         expe = Expes.query.all()
         edc = Edcs.query.all()
-        user = User.query.all()
-        return render_template("dashboard.html", params=params, projects=project, expes=expe, edcs=edc, user=user)
+        return render_template("dashboard.html", params=params, projects=project, expes=expe, edcs=edc)
 
     if request.method=="POST":
         username = request.form.get("uname")
@@ -258,8 +148,7 @@ def dashboard():
             project = Projects. query.all()
             expe = Expes.query.all()
             edc = Edcs.query.all()
-            user = User.query.all()
-            return render_template("dashboard.html", params=params, projects=project, expes=expe, edcs=edc, user=user)
+            return render_template("dashboard.html", params=params, projects=project, expes=expe, edcs=edc)
     else:
         flash("check email, password and try again. ","danger")
         return render_template("login1.html", params=params)
@@ -386,101 +275,10 @@ def customer():
     contact = Contacts.query.all()
     return render_template('customer.html', params=params, contacts=contact)
 
-
-@app.route('/edituser/<string:id>', methods=['GET','POST'])
-def edituser(id):
-    if "admin" in session and session['admin']==params['admin_user']:
-        if request.method=='POST':
-            id = request.form.get('id')
-            uname = request.form.get('uname')
-            umail = request.form.get('umail')
-            password = request.form.get('password')
-            
-            if id == '0':
-                user=User(id=id, uname=uname, umail=umail, password=password)
-                db.session.add(user)
-                db.session.commit()
-            else:
-                user=User.query.filter_by(id=id).first()
-                user.id = id
-                user.uname = uname
-                user.umail = umail
-                user.password = password
-                db.session.commit()
-                return redirect('/edutuser/'+id)
-
-        user=User.query.filter_by(id=id).first()
-        return render_template('edituser.html', params=params,user=user, id=id)
-
-@app.route("/deleteuser/<string:id>" , methods=['GET', 'POST'])
-def deleteuser(id):
-    if "admin" in session and session['admin']==params['admin_user']:
-        user = User.query.filter_by(id=id).first()
-        db.session.delete(user)
-        db.session.commit()
-    return redirect("/dashboard")
-
-
-
 @app.route("/logout", methods=['GET', 'POST'])
 def logout():
     session.pop('admin')
     return redirect("/dashboard")
-
-@app.route('/logout1')
-def logout1():
-    session.pop('mail', None)  # Remove the user from the session
-    return redirect('/')
-
-
-@app.route("/forgot_password", methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        umail = request.form['umail']
-        user = User.query.filter_by(umail=umail).first()
-
-        if user:
-            # Generate a reset token
-            reset_token = secrets.token_hex(16)
-            user.reset_token = reset_token
-            db.session.commit()
-
-            # Send Reset Email
-            reset_link = url_for('reset_password', token=reset_token, _external=True)
-            msg = Message("Password Reset Request",
-                          sender=params['gmail-user'],
-                          recipients=[umail]
-                          )
-            msg.body = f"Click the link below to reset your password:\n{reset_link}"
-            mail.send(msg)
-
-            flash("A password reset link has been sent to your email.", "success")
-            return redirect('/login')
-        else:
-            flash("Email not found. Please enter a valid email.", "danger")
-
-    return render_template("forgot_password.html")
-
-# Reset Password Route
-@app.route("/reset_password/<token>", methods=['GET', 'POST'])
-def reset_password(token):
-    user = User.query.filter_by(reset_token=token).first()
-
-    if not user:
-        flash("Invalid or expired reset token.", "danger")
-        return redirect('/login')
-
-    if request.method == 'POST':
-        new_password = request.form.get('password')
-        user.password = new_password  # Hash password in a real app
-        user.reset_token = None  # Remove token after reset
-        db.session.commit()
-
-        flash("Your password has been successfully reset.", "success")
-        return redirect('/login')
-
-    return render_template("reset_password.html", token=token)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
