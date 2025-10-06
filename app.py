@@ -89,7 +89,7 @@ class Edcs(db.Model):
 def home():
     expe = Expes.query.all()
     edc = Edcs.query.all()
-    return render_template('Index.html', params=params, expes=expe, edcs=edc)
+    return render_template('index.html', params=params, expes=expe, edcs=edc)
 
 @app.route('/resume', methods=['GET'])
 def resume_route():
